@@ -14,7 +14,7 @@ npm run build
 npm run dev
 ```
 
-打开 **http://127.0.0.1:4173**。如端口 4173 已被占用：
+打开 [http://127.0.0.1:4173](http://127.0.0.1:4173)。如端口 4173 已被占用：
 
 ```sh
 npm run dev -- --port 4174
@@ -54,7 +54,7 @@ npm run dev -- --port 4174
 
 ## 开源项目如何复用
 
-这是基于 **asbplayer 源代码的衍生学习入口**，没有重新编写并伪称整合：
+这是基于 **asbplayer 源代码的衍生学习入口**，具体复用方式如下：
 
 - 完整上游源码快照保存在 `upstream/asbplayer/`，固定提交 `c8718d11f933f307088f2463c02e87a39cdc0571`，保留 AGPL-3.0-or-later 许可证。
 - 运行代码直接导入上游的 `SubtitleCollection`，用于按音频时间显示字幕；直接导入 `subtitlesToSrt`，用于导出 SRT。这两个模块未修改。
