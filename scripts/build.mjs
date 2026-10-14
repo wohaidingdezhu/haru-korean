@@ -1,0 +1,11 @@
+import {build} from 'esbuild';
+import {writeSourceArchive} from './source-archive.mjs';
+import {mkdir,cp,rm} from 'node:fs/promises';
+await rm('dist',{recursive:true,force:true});
+await mkdir('dist',{recursive:true});
+await cp('public','dist',{recursive:true});
+await build({entryPoints:['src/app.js'],outfile:'dist/app.js',bundle:true,format:'esm',target:['es2022'],legalComments:'eof',sourcemap:true});
+await cp('LICENSE','dist/LICENSE.txt');
+await cp('THIRD_PARTY_NOTICES.md','dist/THIRD_PARTY_NOTICES.md');
+await writeSourceArchive();
+console.log('Built HARU to dist/ with corresponding source');

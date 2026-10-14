@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/asbplayer/asbplayer",
+  "commit": "c8718d11f933f307088f2463c02e87a39cdc0571",
+  "license": "AGPL-3.0-or-later",
+  "reused_modules": [
+    "common/subtitle-collection/subtitle-collection.ts",
+    "common/subtitle-reader/subtitles-to-srt.ts"
+  ]
+}

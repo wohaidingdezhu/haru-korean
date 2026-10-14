@@ -1,0 +1,38 @@
+name: Pull loc
+
+on:
+    workflow_dispatch:
+
+jobs:
+    pull-loc:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js and pnpm
+              uses: ./.github/actions/setup-node-pnpm
+
+            - name: Install loc dependencies
+              run: pnpm install --filter loc
+
+            - name: Pull loc
+              env:
+                  CROWDIN_API_TOKEN: ${{ secrets.CROWDIN_API_TOKEN }}
+              run: pnpm --filter loc run pull
+
+            - name: Create branch name
+              run: echo "LOC_BRANCH=loc-$(date +'%Y-%m-%d-%H-%M-%S')" >> $GITHUB_ENV
+            - name: Create pull request
+              uses: peter-evans/create-pull-request@v7
+              with:
+                  commit-message: |
+                      Pulled latest loc strings
+                  branch: ${{ env.LOC_BRANCH }}
+            - name: Check outputs
+              if: ${{ steps.cpr.outputs.pull-request-number }}
+              run: |
+                  echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"

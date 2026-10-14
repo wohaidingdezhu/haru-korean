@@ -1,0 +1,22 @@
+name: Push loc
+
+on:
+    workflow_dispatch:
+
+jobs:
+    push-loc:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js and pnpm
+              uses: ./.github/actions/setup-node-pnpm
+
+            - name: Install loc dependencies
+              run: pnpm install --filter loc
+
+            - name: Push loc
+              env:
+                  CROWDIN_API_TOKEN: ${{ secrets.CROWDIN_API_TOKEN }}
+              run: pnpm --filter loc run push
