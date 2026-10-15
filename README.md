@@ -104,3 +104,9 @@ tests/              核心行为测试
 需要 Node.js 24。`npm run build` 生成 Sites Worker、静态学习页面与数据库迁移；`npm run dev:cloud` 启动带模拟登录的云端预览。访问 `/signin-with-chatgpt?return_to=/` 建立仅限本地开发的测试身份。`npm run db:generate` 生成迁移，使用 Sites 发布流程应用到线上数据库。数据库绑定为 `DB`，配置在 `.openai/hosting.json`。
 
 纯本地学习继续使用 `npm run build:local` 与 `npm run dev`，不需要登录。
+
+## 歌曲库
+
+歌曲库支持添加、搜索、按学习状态筛选、切换、修改信息和删除。各首歌独立保存歌词、释义、学习进度、每日分配和播放片段。新增歌曲不会覆盖旧歌；所有歌曲共用每天的新句额度。删除前下载备份，学习历史与复习卡继续保留。
+
+线上站点：https://haru-korean.xjj789789.chatgpt.site/ 。沿用现有 ChatGPT 登录，云端自动保存，无需另外注册账号。日常学习不需要手动备份。

@@ -35,7 +35,7 @@ export class ProgressSync{
   try{
    if(this.dirty){
     const snapshot=this.storage.getItem(this.key);
-    const response=await this.request('/api/progress',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:this.userId,revision:this.revision,state:JSON.parse(snapshot)})});
+    const response=await this.request('/api/progress',{method:'PUT',headers:{'Content-Type':'application/json'},keepalive:new TextEncoder().encode(snapshot).length<60000,body:JSON.stringify({userId:this.userId,revision:this.revision,state:JSON.parse(snapshot)})});
     const data=await response.json();
     if(data.code==='account_changed'){this.ready=false;this.statusChanged('账号已切换，请刷新页面后继续');return;}
     if(response.status===409){this.conflict={...data,state:normalizeState(data.state)};this.statusChanged('同步冲突，请到学习设置选择版本');return;}
