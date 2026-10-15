@@ -69,6 +69,15 @@ export function songBatch(state,now=new Date()){
  if(lines.length)state.songBatches[key]=lines.map(x=>x.id);
  return lines;
 }
+export function dailyStatus(state,light=false,now=new Date()){
+ const key=dayKey(now),batch=songBatch(state,now),day=state.days[key];
+ const basic=day.lessonId===-1||!!(light?(day.basic||day.lightBasic):day.basic);
+ const review=day.reviewIds?.length?day.reviewIds.every(id=>state.reviews.some(x=>x.id===id&&dayKey(new Date(x.at))===key)):light||!!(day.drill||day.basic);
+ const quotaDone=dailySongCount(state,now)>=(light?1:day.songQuota||state.quota);
+ const useWarmup=batch.length===0&&!quotaDone;
+ const song=quotaDone|| (useWarmup?!!(light?(day.warmup||day.lightWarmup):day.warmup):light?batch.some(x=>state.learned.includes(x.id)):batch.every(x=>state.learned.includes(x.id)));
+ return {basic,review,song,useWarmup,quotaDone,complete:basic&&review&&song};
+}
 export function addCard(state,id,front,back,kind='basic',now=new Date()){
  if(!state.cards[id])state.cards[id]={id,front,back,kind,fsrs:createEmptyCard(new Date(now.getTime()+86400000))};
  else state.cards[id].back=back;
