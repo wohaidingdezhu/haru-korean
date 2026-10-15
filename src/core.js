@@ -1,3 +1,5 @@
+import {initialState,normalizeState} from './state.js';
+export {initialState,normalizeState};
 import SrtParser from '@qgustavor/srt-parser';
 import {SubtitleCollection} from '../upstream/asbplayer/common/subtitle-collection/subtitle-collection.ts';
 import {subtitlesToSrt} from '../upstream/asbplayer/common/subtitle-reader/subtitles-to-srt.ts';
@@ -6,16 +8,15 @@ export {Rating,SubtitleCollection};
 export const scheduler=fsrs({request_retention:0.9,enable_fuzz:false});
 export const dayKey=(now=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
 export const previousDay=(key)=>{const d=new Date(key+'T12:00:00+08:00');d.setUTCDate(d.getUTCDate()-1);return dayKey(d);};
-export const initialState=()=>({version:1,quota:2,minutes:15,completedLessons:[],lessonProgress:{},cards:{},reviews:[],days:{},song:{title:'Wedding Dress',artist:'TAEYANG',videoId:'vXNmN0kHRwA',biliBvid:'BV1hL411q7Zb',mvSource:'bilibili',lines:[]},learned:[],notes:{},segment:{start:0,end:10,rate:0.8},songBatches:{}});
-export function normalizeState(value){
- if(!value||value.version!==1||!Array.isArray(value.completedLessons)||!value.cards||!Array.isArray(value.song?.lines))throw Error('这不是 HARU 的进度文件。');
- const base=initialState();const s={...base,...value,song:{...base.song,...value.song}};
- s.quota=value.quota===1?1:2;s.minutes=[3,15,20].includes(value.minutes)?value.minutes:15;
- s.completedLessons=s.completedLessons.filter(x=>Number.isInteger(x)&&x>=0&&x<14);
- for(const line of s.song.lines){if(typeof line.id!=='string'||typeof line.text!=='string'||line.text.length>3000)throw Error('歌词数据格式有误。');}
- for(const c of Object.values(s.cards)){if(!c||typeof c.front!=='string'||typeof c.back!=='string'||!Number.isFinite(new Date(c.fsrs?.due).getTime()))throw Error('复习数据格式有误。');}
- if(!Array.isArray(s.learned)||!Array.isArray(s.reviews)||!s.days||!s.songBatches||!s.notes)throw Error('进度数据格式有误。');
- return s;
+export function recordStudy(state,activity,now=new Date()){
+ const key=dayKey(now);state.days[key]??={};const day=state.days[key];day.activities??=[];
+ if(!day.activities.some(x=>x.kind===activity.kind&&x.id===activity.id))day.activities.push({...activity,at:now.toISOString()});
+}
+export function studyHistory(state){
+ const grouped=new Map();
+ for(const [date,day] of Object.entries(state.days))if(day.complete||day.basic||day.lightBasic||day.song||day.reviews||day.activities?.length)grouped.set(date,{date,...day,activities:day.activities||[],reviewDetails:[]});
+ for(const r of state.reviews){const date=dayKey(new Date(r.at));if(!grouped.has(date))grouped.set(date,{date,activities:[],reviewDetails:[]});const card=state.cards[r.id];grouped.get(date).reviewDetails.push({...r,front:r.front??card?.front??'旧复习卡',back:r.back??card?.back??''});}
+ return [...grouped.values()].sort((a,b)=>b.date.localeCompare(a.date));
 }
 export const hash=(s)=>{let h=2166136261;for(const c of s){h^=c.codePointAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(36);};
 export function parseLyrics(raw,format='auto'){
@@ -50,7 +51,7 @@ export function rateCard(state,id,rating,now=new Date()){
  const c=state.cards[id];if(!c)throw Error('找不到复习卡');
  const card={...c.fsrs,due:new Date(c.fsrs.due)};if(c.fsrs.last_review)card.last_review=new Date(c.fsrs.last_review);
  const next=scheduler.next(card,now,rating);c.fsrs=next.card;
- state.reviews.push({id,at:now.toISOString(),rating});state.reviews=state.reviews.slice(-10000);
+ state.reviews.push({id,at:now.toISOString(),rating,front:c.front,back:c.back});state.reviews=state.reviews.slice(-10000);
  const key=dayKey(now);state.days[key]??={};state.days[key].reviews=(state.days[key].reviews||0)+1;
  return next;
 }
@@ -59,6 +60,7 @@ export function learnLine(state,line,now=new Date()){
  if(!state.learned.includes(line.id))state.learned.push(line.id);
  addCard(state,'song:'+line.id,line.text,state.notes[line.id]||'回想意思，读一遍，再跟着原唱唱一遍。','song',now);
  const key=dayKey(now);state.days[key]??={};state.days[key].song=true;
+ recordStudy(state,{kind:'song',id:line.id,title:state.song.title,front:line.text,back:state.notes[line.id]||''},now);
 }
 export function streak(state,now=new Date()){
  let key=dayKey(now),count=0;if(!state.days[key]?.complete)key=previousDay(key);

@@ -1,7 +1,8 @@
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
-const root=path.resolve('dist');
+import {existsSync} from 'node:fs';
+const root=path.resolve(existsSync('dist/client/index.html')?'dist/client':'dist');
 const args=process.argv.slice(2);const pi=args.indexOf('--port');const port=pi>=0?Number(args[pi+1]):4173;
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Choose a port between 1024 and 65535');
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.zip':'application/zip','.txt':'text/plain; charset=utf-8','.md':'text/plain; charset=utf-8'};
