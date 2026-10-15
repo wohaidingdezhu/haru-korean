@@ -95,9 +95,9 @@ const sentences=[
 ].map(([id,title,meaning,topic,explanation,grammarId])=>({id,category:'sentence',title,meaning,topic,explanation,audio:title,examples:[ex(title,meaning,explanation)],related:grammarId?[grammarId]:[]}));
 const pronunciation=lessons.slice(0,8).map((l,i)=>({id:'p-'+i,category:'pronunciation',topic:i<6?'字母与音节':'收音与音变',title:l.title,meaning:l.preview,explanation:l.goal,audio:l.items[0].audio,lessonId:i,examples:l.items.map(x=>ex(x.front,x.back,x.note))}));
 export const knowledge=[...pronunciation,...grammar,...words,...sentences];
-export function filterKnowledge(category='all',query=''){
+export function filterKnowledge(category='all',query='',scope='all',cards={}){
  const terms=query.normalize('NFKC').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
- return knowledge.filter(x=>{if(category!=='all'&&x.category!==category)return false;const text=[x.title,x.meaning,x.topic,x.explanation,...x.examples.flatMap(e=>[e.ko,e.zh,e.parts||''])].join(' ').normalize('NFKC').toLocaleLowerCase();return terms.every(t=>text.includes(t));});
+ return knowledge.filter(x=>{const saved=!!cards['knowledge:'+x.id];if(scope==='saved'&&!saved||scope==='new'&&saved)return false;if(category!=='all'&&x.category!==category)return false;const text=[x.title,x.meaning,x.topic,x.explanation,...x.examples.flatMap(e=>[e.ko,e.zh,e.parts||''])].join(' ').normalize('NFKC').toLocaleLowerCase();return terms.every(t=>text.includes(t));});
 }
 export function learnKnowledge(state,id,now=new Date()){
  const entry=knowledge.find(x=>x.id===id);if(!entry)throw Error('没有找到这条知识。');

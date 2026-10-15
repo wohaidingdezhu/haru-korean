@@ -83,6 +83,15 @@ export function addCard(state,id,front,back,kind='basic',now=new Date()){
  else state.cards[id].back=back;
 }
 export function dueCards(state,now=new Date()){return Object.values(state.cards).filter(x=>new Date(x.fsrs.due)<=now).sort((a,b)=>new Date(a.fsrs.due)-new Date(b.fsrs.due));}
+export const cardCategory=card=>card.id.startsWith('knowledge:')?'knowledge':card.kind==='song'?'song':'basic';
+export function filterCards(state,query='',category='all'){
+ const terms=query.normalize('NFKC').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+ return Object.entries(state.cards).reverse().map(([id,card])=>({...card,id})).filter(card=>{const text=(card.front+' '+card.back).normalize('NFKC').toLocaleLowerCase();return (category==='all'||cardCategory(card)===category)&&terms.every(term=>text.includes(term));});
+}
+export function practiceCard(state,id,now=new Date()){
+ const card=state.cards[id];if(!card)throw Error('找不到这张卡片。');
+ recordStudy(state,{kind:'basic',id:'selftest:'+id,title:'自由自测',front:card.front,back:card.back},now);
+}
 export function rateCard(state,id,rating,now=new Date()){
  const c=state.cards[id];if(!c)throw Error('找不到复习卡');
  const card={...c.fsrs,due:new Date(c.fsrs.due)};if(c.fsrs.last_review)card.last_review=new Date(c.fsrs.last_review);
