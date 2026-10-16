@@ -43,3 +43,23 @@ test('notebook drafts sync to a second device and retain edits after reconnectin
  updateStudyNote(b.state,note.id,{title:'视频第一讲',body:'아\n元音21个\n补充笔记',source:'课堂 08:10'});b.change();await b.sync.sync();
  const reloaded=device(request,a.store);reloaded.state=await reloaded.sync.connect();assert.match(reloaded.state.studyNotes[0].body,/补充笔记/);assert.equal(reloaded.state.studyNotes[0].id,note.id);
 });
+test('identical concurrent saves acknowledge the latest revision instead of reporting a conflict',async()=>{
+ const request=server(),a=device(request),b=device(request);a.state=await a.sync.connect();b.state=await b.sync.connect();
+ a.state.completedLessons=[0];a.change();await a.sync.sync();b.state.completedLessons=[0];b.change();await b.sync.sync();
+ assert.equal(b.sync.conflict,null);assert.equal(b.sync.dirty,false);assert.equal(b.sync.revision,a.sync.revision);assert.equal(b.status,'云端已同步');
+ const saved=await (await request('/api/progress')).json();assert.equal(saved.revision,1);
+});
+test('reloading an already saved offline snapshot clears stale dirty metadata without another write',async()=>{
+ const request=server(),a=device(request),b=device(request);a.state=await a.sync.connect();b.state=await b.sync.connect();
+ a.state.completedLessons=[0];a.change();await a.sync.sync();b.state.completedLessons=[0];b.change();
+ const reloaded=device(request,b.store);reloaded.state=await reloaded.sync.connect();
+ assert.equal(reloaded.sync.conflict,null);assert.equal(reloaded.sync.dirty,false);assert.equal(reloaded.sync.revision,1);assert.deepEqual(reloaded.state.completedLessons,[0]);
+ assert.equal(JSON.parse(b.store.getItem(reloaded.sync.key+':sync')).dirty,false);
+});
+test('an identical rejected request does not discard newer local edits made while it was in flight',async()=>{
+ const remote=initialState();remote.completedLessons=[0];let release;let waiting=false;
+ const request=async(url,options={})=>options.method==='PUT'?new Promise(resolve=>{waiting=true;release=()=>resolve(Response.json({userId:'a',state:remote,revision:1},{status:409}));}):Response.json({userId:'a',state:initialState(),revision:0});
+ const a=device(request);a.state=await a.sync.connect();a.state.completedLessons=[0];a.change();const saving=a.sync.sync();assert.equal(waiting,true);
+ a.state.notes={draft:'请求途中新增的笔记'};a.change();release();await saving;
+ assert.ok(a.sync.conflict);assert.equal(a.sync.dirty,true);assert.equal(JSON.parse(a.store.getItem(a.sync.key)).notes.draft,'请求途中新增的笔记');
+});

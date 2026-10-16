@@ -14,7 +14,7 @@ export class ProgressSync{
   const raw=this.storage.getItem(this.key),meta=JSON.parse(this.storage.getItem(this.key+':sync')||'null');
   const local=raw?normalizeState(JSON.parse(raw)):null;
   this.ready=true;this.revision=remote.revision;
-  if(local&&meta?.dirty){
+  if(local&&meta?.dirty&&JSON.stringify(local)!==JSON.stringify(incoming)){
    this.revision=meta.revision;this.dirty=true;
    if(meta.revision!==remote.revision){this.conflict={...remote,state:incoming};this.statusChanged('同步冲突，请到学习设置选择版本');}
    else this.statusChanged('有进度待上传');
@@ -38,7 +38,13 @@ export class ProgressSync{
     const response=await this.request('/api/progress',{method:'PUT',headers:{'Content-Type':'application/json'},keepalive:new TextEncoder().encode(snapshot).length<60000,body:JSON.stringify({userId:this.userId,revision:this.revision,state:JSON.parse(snapshot)})});
     const data=await response.json();
     if(data.code==='account_changed'){this.ready=false;this.statusChanged('账号已切换，请刷新页面后继续');return;}
-    if(response.status===409){this.conflict={...data,state:normalizeState(data.state)};this.statusChanged('同步冲突，请到学习设置选择版本');return;}
+    if(response.status===409){
+     const incoming=normalizeState(data.state);
+     // Another tab may have already saved this exact content; compare the latest local edits, not the sent snapshot.
+     if(JSON.stringify(incoming)===this.storage.getItem(this.key)){this.revision=data.revision;this.dirty=false;this.remember();this.onRemote?.(incoming);this.statusChanged('云端已同步');}
+     else{this.conflict={...data,state:incoming};this.statusChanged('同步冲突，请到学习设置选择版本');}
+     return;
+    }
     if(!response.ok)throw Error(data.error||'保存失败');
     this.revision=data.revision;this.dirty=this.storage.getItem(this.key)!==snapshot;this.remember();
     this.statusChanged(this.dirty?'有进度待上传':'云端已同步');

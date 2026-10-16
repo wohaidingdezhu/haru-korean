@@ -21,3 +21,17 @@ export function noteKoreanPhrases(body){
  // shortcut: show up to 100 distinct fragments; add paging if longer notes need more.
  return [...new Set(body.normalize('NFC').match(/(?<![가-힣ㄱ-ㅎㅏ-ㅣ])[가-힣]+(?:[ \t]+[가-힣]+)*(?![가-힣ㄱ-ㅎㅏ-ㅣ])/g)||[])].slice(0,100);
 }
+export function noteTimeLinks(body,source){
+ const href=noteSourceUrl(source);if(!href)return [];
+ const url=new URL(href);if(url.username||url.password)return [];
+ const id=url.hostname==='youtu.be'?url.pathname.slice(1):['youtube.com','www.youtube.com','m.youtube.com'].includes(url.hostname)&&url.pathname==='/watch'?url.searchParams.get('v'):null;
+ if(!/^[\w-]{11}$/.test(id||''))return [];
+ const seen=new Set(),links=[];
+ // shortcut: cap long notes at 40 unique video positions; add paging if a lesson needs more.
+ for(const match of body.matchAll(/(?<![\d:/])\b(?:(\d{1,2}):)?(\d{1,2}):([0-5]\d)\b(?!:\d)/g)){
+  if(match[1]&&Number(match[2])>=60)continue;
+  const seconds=Number(match[1]||0)*3600+Number(match[2])*60+Number(match[3]);
+  if(seen.has(seconds))continue;seen.add(seconds);links.push({label:match[0],href:`https://www.youtube.com/watch?v=${id}&t=${seconds}s`});if(links.length===40)break;
+ }
+ return links;
+}

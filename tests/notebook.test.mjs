@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {initialState,normalizeState} from '../src/state.js';
-import {createStudyNote,updateStudyNote,removeStudyNote,studyNotes,noteSourceUrl,noteKoreanPhrases} from '../src/notebook.js';
+import {createStudyNote,updateStudyNote,removeStudyNote,studyNotes,noteSourceUrl,noteKoreanPhrases,noteTimeLinks} from '../src/notebook.js';
 const now=new Date('2026-10-16T03:00:00Z');
 test('notes preserve Korean text, multiline content, dates and existing song notes through backup',()=>{
  const s=initialState();s.notes={lyric:'原来的歌词备注'};const note=createStudyNote(s,now);
@@ -34,3 +34,15 @@ test('note readings keep Korean phrases intact, skip isolated letters and preser
  assert.deepEqual(noteKoreanPhrases('只有中文、English 和 ㅏ ㄱ ㅇ'),[]);assert.deepEqual(noteKoreanPhrases('아'.normalize('NFD')),['아']);
 });
 test('long notebooks limit rendered reading controls without repeating a phrase',()=>{const text=Array.from({length:120},(_,i)=>String.fromCharCode(0xac00+i)).join('\n');assert.equal(noteKoreanPhrases(text).length,100);});
+test('note time links preserve the exact video and deduplicate minutes and hours without editing content',()=>{
+ const text='01:40｜字母\n03:16、06:32｜元音\n00:03:16｜重复\n1:02:03｜长课\n99:99、1:99:10';
+ const links=noteTimeLinks(text,'https://www.youtube.com/watch?v=smoKuiv5I1g&list=playlist&t=5');
+ assert.deepEqual(links.map(x=>x.label),['01:40','03:16','06:32','1:02:03']);
+ assert.deepEqual(links.map(x=>new URL(x.href).searchParams.get('t')),['100s','196s','392s','3723s']);
+ assert.ok(links.every(x=>new URL(x.href).searchParams.get('v')==='smoKuiv5I1g'));assert.match(text,/99:99/);
+ assert.equal(noteTimeLinks('00:10','https://youtu.be/smoKuiv5I1g')[0].href,links[0].href.replace('100s','10s'));
+});
+test('time links require a trusted YouTube video URL and cap long notes',()=>{
+ for(const source of ['javascript:alert(1)','https://youtube.com.evil.test/watch?v=smoKuiv5I1g','https://evil.test/?v=smoKuiv5I1g','https://www.youtube.com/playlist?list=PL123','https://user:pass@youtu.be/smoKuiv5I1g','https://youtu.be/bad'])assert.deepEqual(noteTimeLinks('01:40',source),[]);
+ assert.equal(noteTimeLinks(Array.from({length:50},(_,i)=>`${i}:00`).join('\n'),'https://youtu.be/smoKuiv5I1g').length,40);
+});
