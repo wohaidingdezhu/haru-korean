@@ -1,9 +1,30 @@
+import {addCard,recordStudy} from './core.js';
+import {lessons} from './curriculum.js';
+import {recordMistake,resolveMistake} from './mistakes.js';
 // Keep practice tied to the lesson's explanations; no extra account or content setup.
 export function lessonQuestions(lesson){
  const questions=lesson.quiz.map(q=>[...q]);
  for(const x of lesson.items)questions.push([`「${x.back}」对应哪一项？`,lesson.items.map(item=>item.front),lesson.items.indexOf(x),x.note]);
  for(const x of lesson.items.slice(0,2))questions.push(['听示范，选出对应的韩文。',lesson.items.map(item=>item.front),lesson.items.indexOf(x),x.note,x.audio,x.front]);
  return questions.map((q,i)=>{const choices=[...q[1]],shift=i%choices.length;return [q[0],[...choices.slice(shift),...choices.slice(0,shift)],(q[2]-shift+choices.length)%choices.length,...q.slice(3)];});
+}
+export function lessonSession(state,id,light=false){
+ const lesson=lessons[id],p=state.lessonProgress[id]||0;
+ return {id,index:Math.min(p,lesson.items.length-1),quiz:state.quizProgress[id]||0,phase:!light&&p>=lesson.items.length?'quiz':'learn',light,questions:lessonQuestions(lesson)};
+}
+export function learnLessonItem(state,id,index,now=new Date()){
+ const lesson=lessons[id],x=lesson.items[index];
+ addCard(state,'basic:'+id+':'+index,x.front,x.back+'\n'+x.note,'basic',now);
+ recordStudy(state,{kind:'basic',id:'basic:'+id+':'+index,title:lesson.title,front:x.front,back:x.back+'\n'+x.note},now);
+ state.lessonProgress[id]=Math.max(state.lessonProgress[id]||0,index+1);
+}
+export function recordQuizAnswer(state,session,choice,now=new Date()){
+ const q=session.questions[session.quiz],key=session.mistakeKeys?.[session.quiz];
+ if(!q||!Number.isInteger(choice)||!q[1][choice])throw Error('题目数据格式有误。');
+ if(choice!==q[2]){const entry=key?state.mistakes[key]:null;recordMistake(state,entry?.lessonId??session.id,entry?.questionIndex??session.quiz,q,choice,now);return false;}
+ if(key)resolveMistake(state,key,now);
+ else recordStudy(state,{kind:'basic',id:`${session.practiceOnly?'drill':'quiz'}:${session.id}:${session.quiz}`,title:(session.practiceOnly?'今日巩固':'小课练习')+' · '+lessons[session.id].title,front:q[0],back:'正确答案：'+q[1][q[2]]+'\n'+q[3]},now);
+ return true;
 }
 export function warmupItems(lesson,id){
  if(id===0)return [
