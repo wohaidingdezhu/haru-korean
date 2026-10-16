@@ -1,4 +1,4 @@
-export const initialState=()=>({version:1,quota:2,minutes:15,completedLessons:[],lessonProgress:{},quizProgress:{},cards:{},reviews:[],days:{},songId:'default-song',songs:[],song:{title:'Wedding Dress',artist:'TAEYANG',videoId:'vXNmN0kHRwA',biliBvid:'BV1hL411q7Zb',mvSource:'bilibili',lines:[]},learned:[],notes:{},segment:{start:0,end:10,rate:0.8},songBatches:{}});
+export const initialState=()=>({version:1,quota:2,minutes:15,completedLessons:[],lessonProgress:{},quizProgress:{},mistakes:{},cards:{},reviews:[],days:{},songId:'default-song',songs:[],song:{title:'Wedding Dress',artist:'TAEYANG',videoId:'vXNmN0kHRwA',biliBvid:'BV1hL411q7Zb',mvSource:'bilibili',lines:[]},learned:[],notes:{},segment:{start:0,end:10,rate:0.8},songBatches:{}});
 export function normalizeState(value){
  if(!value||value.version!==1||!Array.isArray(value.completedLessons)||!value.cards||!Array.isArray(value.song?.lines))throw Error('这不是 HARU 的进度文件。');
  const base=initialState();const s={...base,...value,song:{...base.song,...value.song}};
@@ -7,9 +7,14 @@ export function normalizeState(value){
  for(const line of s.song.lines){if(typeof line.id!=='string'||typeof line.text!=='string'||line.text.length>3000)throw Error('歌词数据格式有误。');}
  for(const c of Object.values(s.cards)){if(!c||typeof c.front!=='string'||typeof c.back!=='string'||!Number.isFinite(new Date(c.fsrs?.due).getTime()))throw Error('复习数据格式有误。');}
  const object=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
- if(!Array.isArray(s.learned)||!Array.isArray(s.reviews)||!object(s.cards)||!object(s.days)||!object(s.songBatches)||!object(s.notes)||!object(s.lessonProgress)||!object(s.quizProgress)||!object(s.segment))throw Error('进度数据格式有误。');
+ if(!Array.isArray(s.learned)||!Array.isArray(s.reviews)||!object(s.cards)||!object(s.days)||!object(s.songBatches)||!object(s.notes)||!object(s.lessonProgress)||!object(s.quizProgress)||!object(s.mistakes)||!object(s.segment))throw Error('进度数据格式有误。');
  for(const [id,index] of Object.entries(s.lessonProgress))if(!/^\d+$/.test(id)||Number(id)>=14||!Number.isInteger(index)||index<0||index>4)throw Error('课程进度格式有误。');
  for(const [id,index] of Object.entries(s.quizProgress))if(!/^\d+$/.test(id)||Number(id)>=14||!Number.isInteger(index)||index<0||index>=8)throw Error('答题进度格式有误。');
+ if(Object.keys(s.mistakes).length>112)throw Error('错题数量有误。');
+ for(const [id,m] of Object.entries(s.mistakes)){
+  if(!object(m)||!Number.isInteger(m.lessonId)||m.lessonId<0||m.lessonId>=14||!Number.isInteger(m.questionIndex)||m.questionIndex<0||m.questionIndex>=8||id!==m.lessonId+':'+m.questionIndex||!Number.isSafeInteger(m.count)||m.count<1||!Number.isFinite(Date.parse(m.lastWrongAt))||m.resolvedAt!==null&&!Number.isFinite(Date.parse(m.resolvedAt)))throw Error('错题记录格式有误。');
+  const q=m.question;if(!Array.isArray(q)||q.length<4||q.length>6||typeof q[0]!=='string'||!q[0]||q[0].length>3000||!Array.isArray(q[1])||q[1].length<2||q[1].length>8||q[1].some(x=>typeof x!=='string'||!x||x.length>3000)||!Number.isInteger(q[2])||q[2]<0||q[2]>=q[1].length||typeof q[3]!=='string'||q[3].length>3000||q.slice(4).some(x=>typeof x!=='string'||x.length>3000)||typeof m.wrongAnswer!=='string'||!q[1].includes(m.wrongAnswer)||m.wrongAnswer===q[1][q[2]])throw Error('错题内容格式有误。');
+ }
  for(const [key,d] of Object.entries(s.days)){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(key)||!object(d)||d.lessonId!==undefined&&(!Number.isInteger(d.lessonId)||d.lessonId< -1||d.lessonId>=14)||d.reviewIds!==undefined&&(!Array.isArray(d.reviewIds)||d.reviewIds.some(id=>typeof id!=='string')))throw Error('每日进度格式有误。');
   for(const [name,max] of [['drillProgress',7],['warmupProgress',3]])if(d[name]!==undefined&&(!Number.isInteger(d[name])||d[name]<0||d[name]>max))throw Error('每日练习进度格式有误。');

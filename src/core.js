@@ -95,10 +95,18 @@ export function practiceCard(state,id,now=new Date()){
 export function rateCard(state,id,rating,now=new Date()){
  const c=state.cards[id];if(!c)throw Error('找不到复习卡');
  const card={...c.fsrs,due:new Date(c.fsrs.due)};if(c.fsrs.last_review)card.last_review=new Date(c.fsrs.last_review);
+ const key=dayKey(now),before=structuredClone(c.fsrs),previousCount=state.days[key]?.reviews,previousComplete=state.days[key]?.complete,discarded=state.reviews.slice(0,Math.max(0,state.reviews.length+1-10000));
  const next=scheduler.next(card,now,rating);c.fsrs=next.card;
  state.reviews.push({id,at:now.toISOString(),rating,front:c.front,back:c.back});state.reviews=state.reviews.slice(-10000);
- const key=dayKey(now);state.days[key]??={};state.days[key].reviews=(state.days[key].reviews||0)+1;
- return next;
+ state.days[key]??={};state.days[key].reviews=(state.days[key].reviews||0)+1;
+ return {...next,undo:{id,key,before,previousCount,previousComplete,discarded,review:state.reviews.at(-1),current:next.card}};
+}
+export function undoRating(state,change,now=new Date()){
+ if(!change||change.key!==dayKey(now)||state.reviews.at(-1)!==change.review||state.cards[change.id]?.fsrs!==change.current||state.days[change.key]?.reviews!==(change.previousCount||0)+1||state.days[change.key]?.complete!==change.previousComplete)return false;
+ state.cards[change.id].fsrs=change.before;
+ state.reviews=[...change.discarded,...state.reviews.slice(0,-1)];
+ if(change.previousCount===undefined)delete state.days[change.key].reviews;else state.days[change.key].reviews=change.previousCount;
+ return true;
 }
 export function learnLine(state,line,now=new Date()){
  if(!songBatch(state,now).some(x=>x.id===line.id))throw Error('今天的新句额度已用完，下一句留到明天。');
