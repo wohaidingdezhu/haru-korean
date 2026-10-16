@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {initialState} from '../src/core.js';
 import {handleProgress} from '../src/progress-api.js';
+import {createStudyNote,updateStudyNote} from '../src/notebook.js';
 function database(){const sql=new DatabaseSync(':memory:');sql.exec('CREATE TABLE progress (user_id TEXT PRIMARY KEY, state TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL)');return {prepare(query){return {bind(...args){return {first:()=>sql.prepare(query).get(...args),run:()=>({meta:{changes:sql.prepare(query).run(...args).changes}})};}}},close:()=>sql.close()};}
 const user={userId:'user-a'},other={userId:'user-b'};
 const get=()=>new Request('https://haru.test/api/progress');
@@ -26,5 +27,14 @@ test('invalid backups and cross-origin writes leave the cloud record unchanged',
   const oversized=new Request('https://haru.test/api/progress',{method:'PUT',headers:{Origin:'https://haru.test','Content-Length':'3000001'},body:'{}'});
   assert.equal((await handleProgress(oversized,db,user)).status,413);
   const response=await handleProgress(get(),db,user);assert.equal(response.headers.get('cache-control'),'private, no-store');assert.equal((await response.json()).state,null);
+ }finally{db.close();}
+});
+test('cloud stores personal notebook content and rejects malformed replacements without losing it',async()=>{
+ const db=database();try{
+  const s=initialState(),note=createStudyNote(s);updateStudyNote(s,note.id,{title:'第一讲',body:'아\n课堂笔记',source:'视频课'});
+  assert.equal((await handleProgress(put(0,s),db,user)).status,200);
+  const saved=await(await handleProgress(get(),db,user)).json();assert.equal(saved.state.studyNotes[0].body,'아\n课堂笔记');
+  const broken=structuredClone(s);broken.studyNotes[0].body=null;assert.equal((await handleProgress(put(1,broken),db,user)).status,400);
+  assert.equal((await(await handleProgress(get(),db,user)).json()).state.studyNotes[0].body,'아\n课堂笔记');assert.equal((await(await handleProgress(get(),db,other)).json()).state,null);
  }finally{db.close();}
 });

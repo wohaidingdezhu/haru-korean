@@ -1,4 +1,5 @@
-export const initialState=()=>({version:1,quota:2,minutes:15,completedLessons:[],lessonProgress:{},quizProgress:{},mistakes:{},cards:{},reviews:[],days:{},songId:'default-song',songs:[],song:{title:'Wedding Dress',artist:'TAEYANG',videoId:'vXNmN0kHRwA',biliBvid:'BV1hL411q7Zb',mvSource:'bilibili',lines:[]},learned:[],notes:{},segment:{start:0,end:10,rate:0.8},songBatches:{}});
+import {validateStudyNote} from './notebook.js';
+export const initialState=()=>({version:1,quota:2,minutes:15,completedLessons:[],lessonProgress:{},quizProgress:{},mistakes:{},studyNotes:[],cards:{},reviews:[],days:{},songId:'default-song',songs:[],song:{title:'Wedding Dress',artist:'TAEYANG',videoId:'vXNmN0kHRwA',biliBvid:'BV1hL411q7Zb',mvSource:'bilibili',lines:[]},learned:[],notes:{},segment:{start:0,end:10,rate:0.8},songBatches:{}});
 export function normalizeState(value){
  if(!value||value.version!==1||!Array.isArray(value.completedLessons)||!value.cards||!Array.isArray(value.song?.lines))throw Error('这不是 HARU 的进度文件。');
  const base=initialState();const s={...base,...value,song:{...base.song,...value.song}};
@@ -7,6 +8,8 @@ export function normalizeState(value){
  for(const line of s.song.lines){if(typeof line.id!=='string'||typeof line.text!=='string'||line.text.length>3000)throw Error('歌词数据格式有误。');}
  for(const c of Object.values(s.cards)){if(!c||typeof c.front!=='string'||typeof c.back!=='string'||!Number.isFinite(new Date(c.fsrs?.due).getTime()))throw Error('复习数据格式有误。');}
  const object=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
+ if(!Array.isArray(s.studyNotes)||s.studyNotes.length>200)throw Error('学习笔记格式有误。');
+ const noteIds=new Set();for(const note of s.studyNotes){validateStudyNote(note);if(noteIds.has(note.id))throw Error('学习笔记重复。');noteIds.add(note.id);}
  if(!Array.isArray(s.learned)||!Array.isArray(s.reviews)||!object(s.cards)||!object(s.days)||!object(s.songBatches)||!object(s.notes)||!object(s.lessonProgress)||!object(s.quizProgress)||!object(s.mistakes)||!object(s.segment))throw Error('进度数据格式有误。');
  for(const [id,index] of Object.entries(s.lessonProgress))if(!/^\d+$/.test(id)||Number(id)>=14||!Number.isInteger(index)||index<0||index>4)throw Error('课程进度格式有误。');
  for(const [id,index] of Object.entries(s.quizProgress))if(!/^\d+$/.test(id)||Number(id)>=14||!Number.isInteger(index)||index<0||index>=8)throw Error('答题进度格式有误。');

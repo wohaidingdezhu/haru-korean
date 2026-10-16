@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {initialState} from '../src/core.js';
 import {ProgressSync} from '../src/cloud.js';
+import {createStudyNote,updateStudyNote} from '../src/notebook.js';
 const storage=()=>{const values=new Map();return {getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v)};};
 function server(){let state=null,revision=0;return async(url,options={})=>{
  if(options.method==='PUT'){const value=JSON.parse(options.body);if(value.revision!==revision)return Response.json({userId:'a',state,revision},{status:409});state=value.state;revision++;return Response.json({revision});}
@@ -34,4 +35,11 @@ test('the default browser fetch is invoked without binding it to the sync instan
  try{globalThis.fetch=function(){assert.equal(this,undefined);return Promise.resolve(Response.json({userId:'a',state:initialState(),revision:0}));};
  const sync=new ProgressSync({storage:storage(),onRemote:()=>{}});assert.ok(await sync.connect());
  }finally{globalThis.fetch=original;}
+});
+test('notebook drafts sync to a second device and retain edits after reconnecting',async()=>{
+ const request=server(),a=device(request),b=device(request);a.state=await a.sync.connect();b.state=await b.sync.connect();
+ const note=createStudyNote(a.state);updateStudyNote(a.state,note.id,{title:'视频第一讲',body:'아\n元音21个',source:'课堂 08:10'});a.change();await a.sync.sync();await b.sync.sync();
+ assert.equal(b.state.studyNotes[0].body,'아\n元音21个');
+ updateStudyNote(b.state,note.id,{title:'视频第一讲',body:'아\n元音21个\n补充笔记',source:'课堂 08:10'});b.change();await b.sync.sync();
+ const reloaded=device(request,a.store);reloaded.state=await reloaded.sync.connect();assert.match(reloaded.state.studyNotes[0].body,/补充笔记/);assert.equal(reloaded.state.studyNotes[0].id,note.id);
 });
