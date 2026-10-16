@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {initialState,normalizeState} from '../src/state.js';
-import {createStudyNote,updateStudyNote,removeStudyNote,studyNotes,noteSourceUrl} from '../src/notebook.js';
+import {createStudyNote,updateStudyNote,removeStudyNote,studyNotes,noteSourceUrl,noteKoreanPhrases} from '../src/notebook.js';
 const now=new Date('2026-10-16T03:00:00Z');
 test('notes preserve Korean text, multiline content, dates and existing song notes through backup',()=>{
  const s=initialState();s.notes={lyric:'原来的歌词备注'};const note=createStudyNote(s,now);
@@ -28,3 +28,9 @@ test('blank titles use a safe default, capacity checks preserve saved notes and 
  while(s.studyNotes.length<200)createStudyNote(s,now);assert.throws(()=>createStudyNote(s,now));assert.equal(s.studyNotes.length,200);
  const copy=structuredClone(s);copy.studyNotes.push({...n,id:'extra'});assert.throws(()=>normalizeState(copy));
 });
+test('note readings keep Korean phrases intact, skip isolated letters and preserve the note',()=>{
+ const body='ㅏ → 아 (a)\nㄱ → 가 (ga)\n저는 학생입니다.\n저는 학생입니다.\nㅂ니다, ㄱ나다, 은/는\n中文与 <img src=x onerror=alert(1)> 안녕하세요';
+ assert.deepEqual(noteKoreanPhrases(body),['아','가','저는 학생입니다','은','는','안녕하세요']);assert.match(body,/<img/);
+ assert.deepEqual(noteKoreanPhrases('只有中文、English 和 ㅏ ㄱ ㅇ'),[]);assert.deepEqual(noteKoreanPhrases('아'.normalize('NFD')),['아']);
+});
+test('long notebooks limit rendered reading controls without repeating a phrase',()=>{const text=Array.from({length:120},(_,i)=>String.fromCharCode(0xac00+i)).join('\n');assert.equal(noteKoreanPhrases(text).length,100);});

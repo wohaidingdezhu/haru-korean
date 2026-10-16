@@ -17,3 +17,7 @@ export function studyNotes(state,query=''){
  return state.studyNotes.filter(note=>{const text=(note.title+' '+note.body+' '+note.source).normalize('NFKC').toLocaleLowerCase();return terms.every(term=>text.includes(term));}).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
 }
 export function noteSourceUrl(source){try{const url=new URL(source);return ['http:','https:'].includes(url.protocol)?url.href:null;}catch{return null;}}
+export function noteKoreanPhrases(body){
+ // shortcut: show up to 100 distinct fragments; add paging if longer notes need more.
+ return [...new Set(body.normalize('NFC').match(/(?<![가-힣ㄱ-ㅎㅏ-ㅣ])[가-힣]+(?:[ \t]+[가-힣]+)*(?![가-힣ㄱ-ㅎㅏ-ㅣ])/g)||[])].slice(0,100);
+}
