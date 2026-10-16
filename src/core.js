@@ -72,7 +72,7 @@ export function songBatch(state,now=new Date()){
 export function dailyStatus(state,light=false,now=new Date()){
  const key=dayKey(now),batch=songBatch(state,now),day=state.days[key];
  const basic=day.lessonId===-1||!!(light?(day.basic||day.lightBasic):day.basic);
- const review=day.reviewIds?.length?day.reviewIds.every(id=>state.reviews.some(x=>x.id===id&&dayKey(new Date(x.at))===key)):light||!!(day.drill||day.basic);
+ const review=day.reviewIds?.length?reviewProgress(state,now).pendingIds.length===0:light||!!(day.drill||day.basic);
  const quotaDone=dailySongCount(state,now)>=(light?1:day.songQuota||state.quota);
  const useWarmup=batch.length===0&&!quotaDone;
  const song=quotaDone|| (useWarmup?!!(light?(day.warmup||day.lightWarmup):day.warmup):light?batch.some(x=>state.learned.includes(x.id)):batch.every(x=>state.learned.includes(x.id)));
@@ -123,3 +123,34 @@ export function streak(state,now=new Date()){
 export function toAnki(state){const clean=(s)=>s.replace(/\t/g,' ').replace(/\r?\n/g,' / ').replace(/<[^>]*>/g,'');return ['#separator:Tab','#html:false','#columns:Front\tBack\tTags',...Object.values(state.cards).map(x=>[clean(x.front),clean(x.back),'haru '+x.kind].join('\t'))].join('\n');}
 export function toSrt(lines){return subtitlesToSrt(lines.filter(x=>x.start!==null).map(x=>({...x,start:x.start,end:x.end})));}
 export function validateSegment(start,end,duration){return Number.isFinite(start)&&Number.isFinite(end)&&start>=0&&end>start&&(!Number.isFinite(duration)||end<=duration);}
+
+// The latest recall rating matters: an Again answer should leave today's task pending.
+export function reviewProgress(state, now = new Date()) {
+ const key=dayKey(now),ids=state.days[key]?.reviewIds||[],latest=new Map();
+ for(const review of state.reviews)if(dayKey(new Date(review.at))===key)latest.set(review.id,review.rating);
+ const pendingIds=ids.filter(id=>!latest.has(id)||latest.get(id)===Rating.Again);
+ const waiting=pendingIds.map(id=>state.cards[id]).filter(card=>card&&new Date(card.fsrs.due)>now).sort((a,b)=>new Date(a.fsrs.due)-new Date(b.fsrs.due));
+ return {total:ids.length,completed:ids.length-pendingIds.length,pendingIds,waiting,nextDue:waiting[0]?.fsrs.due};
+}
+export function reviewIntervals(card, now = new Date()) {
+ const fsrsCard={...card.fsrs,due:new Date(card.fsrs.due)};
+ if(fsrsCard.last_review)fsrsCard.last_review=new Date(fsrsCard.last_review);
+ const preview=scheduler.repeat(fsrsCard,now);
+ return Object.fromEntries([Rating.Again,Rating.Hard,Rating.Good,Rating.Easy].map(rating=>[rating,preview[rating].card.due]));
+}
+export function formatReviewDelay(due, now = new Date()) {
+ const seconds=Math.max(0,Math.ceil((new Date(due)-now)/1000));
+ if(seconds<60)return seconds===0?'现在':seconds+' 秒后';
+ if(seconds<3600)return Math.ceil(seconds/60)+' 分钟后';
+ if(seconds<86400)return Math.ceil(seconds/3600)+' 小时后';
+ return Math.ceil(seconds/86400)+' 天后';
+}
+export function setLineTiming(state, id, start, end, duration=Infinity) {
+ const line=state.song.lines.find(item=>item.id===id);
+ if(!line)throw Error('找不到这句歌词。');
+ if(!validateSegment(start,end,duration))throw Error('请设置有效时间：起点 ≥ 0，终点大于起点，并且不超过音频长度。');
+ const startMs=Math.round(start*1000),endMs=Math.round(end*1000);
+ if(endMs<=startMs)throw Error('片段至少需要 1 毫秒。');
+ line.start=startMs;line.end=endMs;
+ return line;
+}
