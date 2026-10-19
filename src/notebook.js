@@ -9,12 +9,13 @@ export function createStudyNote(state,now=new Date()){
 export function updateStudyNote(state,id,fields,now=new Date()){
  const note=state.studyNotes.find(x=>x.id===id);if(!note)throw Error('找不到这篇笔记。');
  const next={...note,title:fields.title.trim()||'未命名笔记',body:fields.body,source:fields.source.trim(),updatedAt:now.toISOString()};
- validateStudyNote(next);Object.assign(note,next);return note;
+ validateStudyNote(next);if(next.title===note.title&&next.body===note.body&&next.source===note.source)return note;
+ Object.assign(note,next);return note;
 }
 export function removeStudyNote(state,id){const index=state.studyNotes.findIndex(x=>x.id===id);if(index<0)throw Error('找不到这篇笔记。');state.studyNotes.splice(index,1);}
-export function studyNotes(state,query=''){
+export function studyNotes(state,query='',sort='updated'){
  const terms=query.normalize('NFKC').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
- return state.studyNotes.filter(note=>{const text=(note.title+' '+note.body+' '+note.source).normalize('NFKC').toLocaleLowerCase();return terms.every(term=>text.includes(term));}).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+ return state.studyNotes.filter(note=>{const text=(note.title+' '+note.body+' '+note.source).normalize('NFKC').toLocaleLowerCase();return terms.every(term=>text.includes(term));}).sort((a,b)=>sort==='title'?a.title.localeCompare(b.title,'zh-CN',{numeric:true}):b.updatedAt.localeCompare(a.updatedAt));
 }
 export function noteSourceUrl(source){try{const url=new URL(source);return ['http:','https:'].includes(url.protocol)?url.href:null;}catch{return null;}}
 export function noteKoreanPhrases(body){

@@ -2,6 +2,23 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {initialState,normalizeState} from '../src/state.js';
 import {createStudyNote,updateStudyNote,removeStudyNote,studyNotes,noteSourceUrl,noteKoreanPhrases,noteTimeLinks} from '../src/notebook.js';
 const now=new Date('2026-10-16T03:00:00Z');
+test('unchanged normalized note fields retain the modification date',()=>{
+ const s=initialState(),note=createStudyNote(s,now);
+ const fields={title:'第一讲',body:'아\n元音',source:'https://example.com/lesson'};
+ updateStudyNote(s,note.id,fields,now);
+ updateStudyNote(s,note.id,{...fields,title:' 第一讲 ',source:fields.source+' '},new Date(now.getTime()+1000));
+ assert.equal(note.updatedAt,now.toISOString());
+ updateStudyNote(s,note.id,{...fields,body:fields.body+'\n补充'},new Date(now.getTime()+2000));
+ assert.equal(note.updatedAt,new Date(now.getTime()+2000).toISOString());
+});
+test('title sorting follows natural lesson order after filtering without moving stored notes',()=>{
+ const s=initialState();
+ for(const title of ['SEEMILE 2','SEEMILE 1','SEEMILE 10']){const n=createStudyNote(s,now);updateStudyNote(s,n.id,{title,body:'元音',source:''},now);}
+ const before=structuredClone(s.studyNotes);
+ assert.deepEqual(studyNotes(s,'元音','title').map(x=>x.title),['SEEMILE 1','SEEMILE 2','SEEMILE 10']);
+ assert.deepEqual(studyNotes(s,'SEEMILE 2','title').map(x=>x.title),['SEEMILE 2']);
+ assert.deepEqual(s.studyNotes,before);
+});
 test('notes preserve Korean text, multiline content, dates and existing song notes through backup',()=>{
  const s=initialState();s.notes={lyric:'原来的歌词备注'};const note=createStudyNote(s,now);
  updateStudyNote(s,note.id,{title:' 第一讲 ',body:'元音 아\n辅音 ㅇ\n19 / 21 / 27',source:' 课程第一讲 08:10 '},new Date(now.getTime()+1000));
