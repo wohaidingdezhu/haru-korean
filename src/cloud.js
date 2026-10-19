@@ -41,7 +41,7 @@ export class ProgressSync{
     if(response.status===409){
      const incoming=normalizeState(data.state);
      // Another tab may have already saved this exact content; compare the latest local edits, not the sent snapshot.
-     if(JSON.stringify(incoming)===this.storage.getItem(this.key)){this.revision=data.revision;this.dirty=false;this.remember();this.statusChanged('云端已同步');}
+     if(JSON.stringify(incoming)===this.storage.getItem(this.key)){this.revision=data.revision;this.dirty=false;this.remember();this.onRemote?.(incoming);this.statusChanged('云端已同步');}
      else{this.conflict={...data,state:incoming};this.statusChanged('同步冲突，请到学习设置选择版本');}
      return;
     }
@@ -55,7 +55,7 @@ export class ProgressSync{
     if(data.userId!==this.userId){this.ready=false;this.statusChanged('账号已切换，请刷新页面后继续');return;}
     if(this.dirty)return;
     if(data.revision!==this.revision){
-     const next=normalizeState(data.state),text=JSON.stringify(next),changed=text!==this.storage.getItem(this.key);this.revision=data.revision;this.storage.setItem(this.key,text);this.remember();if(changed)this.onRemote(next);
+     const next=normalizeState(data.state);this.revision=data.revision;this.storage.setItem(this.key,JSON.stringify(next));this.remember();this.onRemote(next);
     }
     this.statusChanged('云端已同步');
    }

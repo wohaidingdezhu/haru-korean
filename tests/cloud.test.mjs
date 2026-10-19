@@ -45,18 +45,15 @@ test('notebook drafts sync to a second device and retain edits after reconnectin
 });
 test('identical concurrent saves acknowledge the latest revision instead of reporting a conflict',async()=>{
  const request=server(),a=device(request),b=device(request);a.state=await a.sync.connect();b.state=await b.sync.connect();
- let replacements=0;b.sync.onRemote=()=>replacements++;
  a.state.completedLessons=[0];a.change();await a.sync.sync();b.state.completedLessons=[0];b.change();await b.sync.sync();
  assert.equal(b.sync.conflict,null);assert.equal(b.sync.dirty,false);assert.equal(b.sync.revision,a.sync.revision);assert.equal(b.status,'云端已同步');
  const saved=await (await request('/api/progress')).json();assert.equal(saved.revision,1);
- assert.equal(replacements,0);
 });
-test('polling a newer revision with identical content does not replace the current view',async()=>{
- const request=server(),a=device(request),b=device(request);a.state=await a.sync.connect();b.state=await b.sync.connect();
- a.state.completedLessons=[0];a.change();await a.sync.sync();await b.sync.sync();
- let replacements=0;b.sync.onRemote=()=>replacements++;
- a.state.completedLessons=[];a.change();await a.sync.sync();a.state.completedLessons=[0];a.change();await a.sync.sync();
- await b.sync.sync();assert.equal(b.sync.revision,3);assert.equal(replacements,0);assert.equal(b.sync.dirty,false);
+test('tabs sharing browser storage still receive remote changes in their in-memory state',async()=>{
+ const request=server(),store=storage(),a=device(request,store),b=device(request,store);a.state=await a.sync.connect();b.state=await b.sync.connect();
+ a.state.notes={draft:'另一标签页保存的内容'};a.change();await a.sync.sync();
+ assert.deepEqual(b.state.notes,{});await b.sync.sync();
+ assert.deepEqual(b.state.notes,a.state.notes);assert.equal(b.sync.revision,a.sync.revision);
 });
 test('reloading an already saved offline snapshot clears stale dirty metadata without another write',async()=>{
  const request=server(),a=device(request),b=device(request);a.state=await a.sync.connect();b.state=await b.sync.connect();
