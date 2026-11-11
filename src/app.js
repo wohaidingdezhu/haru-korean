@@ -16,6 +16,7 @@ const views=['today','course','song','review','settings','history','library','kn
 const viewFromUrl=()=>views.includes(location.hash.slice(1))?location.hash.slice(1):'today';
 let notebookQuery='',notebookSort='updated',studyNoteId=null,notebookEditing=false;
 let view=viewFromUrl(),mini=state.minutes===3,session=null,reviewId=null,revealed=false,importPreview=null,toastTimer;
+let reviewWakeTimer=null;
 let player=null,playerReady=false,playerFailed=false,localUrl=null,loopOn=false,segmentActive=false,ticker=null,pendingSegment=false;
 const mediaCache=new MediaCache();let mediaGeneration=0,localMediaName='',activeMediaKey=null;
 const currentMediaKey=()=>mediaCacheKey(cloud.userId,state.songId);
@@ -37,7 +38,18 @@ function dailyComplete(){
 }
 function syncSidebar(){el('sideSongTitle').textContent=state.songId?state.song.title:'还没有歌曲';el('sideSongArtist').textContent=state.song.artist||'添加一首喜欢的歌';el('dueBadge').textContent=dueCards(state).length;el('sideProgress').style.width=Math.round(state.completedLessons.length/lessons.length*100)+'%';el('sideCount').textContent=`基础小课 ${state.completedLessons.length} / ${lessons.length} · 歌曲 ${state.learned.length} 句`;document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.view===(view==='song'?'library':view)));el('viewLabel').textContent={today:'今日学习',song:'歌曲工作台',course:'基础小课',review:'我的复习',settings:'学习设置',history:'学习历史',library:'歌曲库',knowledge:'知识库',notebook:'学习笔记'}[view];}
 function navigate(next){if(!views.includes(next))return;if(next!=='review')lastRating=null;if(el('lessonDialog').open)el('lessonDialog').close();if(next==='song'&&!state.songId)next='library';audio.pause();if(playerReady)player.pauseVideo();loopOn=false;segmentActive=false;clearInterval(ticker);ticker=null;if(view==='song')disposeVideo();view=next;if(location.hash!=='#'+next)history.pushState(null,'','#'+next);reviewId=null;revealed=false;render();window.scrollTo({top:0,behavior:'smooth'});}
-function render(){if(view==='song'&&!state.songId){view='library';history.replaceState(null,'','#library');}if(view==='song')disposeVideo();syncSidebar();el('content').classList.toggle('minimode',mini);el('content').innerHTML=({today:renderToday,song:renderSong,course:renderCourse,review:renderReview,settings:renderSettings,history:renderHistory,library:renderLibrary,knowledge:renderKnowledge,notebook:renderNotebook}[view])();bind();save();if(view==='song'&&state.songId)mountSong();}
+function render(){clearTimeout(reviewWakeTimer);if(view==='song'&&!state.songId){view='library';history.replaceState(null,'','#library');}if(view==='song')disposeVideo();syncSidebar();el('content').classList.toggle('minimode',mini);el('content').innerHTML=({today:renderToday,song:renderSong,course:renderCourse,review:renderReview,settings:renderSettings,history:renderHistory,library:renderLibrary,knowledge:renderKnowledge,notebook:renderNotebook}[view])();bind();save();if(view==='song'&&state.songId)mountSong();scheduleReviewWake();}
+function scheduleReviewWake(){
+ if(view!=='review'||reviewMode!=='due'||dueCards(state).length)return;
+ const next=reviewProgress(state).nextDue;if(!next)return;
+ const delay=Math.max(0,new Date(next).getTime()-Date.now());
+ reviewWakeTimer=setTimeout(()=>{
+  if(view!=='review'||reviewMode!=='due')return;
+  if(el('lessonDialog').open){reviewWakeTimer=setTimeout(scheduleReviewWake,2000);return;}
+  if(dueCards(state).length){reviewId=null;revealed=false;render();}
+  else scheduleReviewWake();
+ },Math.min(delay+100,2147483647));
+}
 function progressWeek(){let end=dayKey(),keys=[];for(let i=0;i<7;i++){keys.unshift(end);end=previousDay(end);}return keys.map(k=>`<div class="day ${state.days[k]?.complete?'done':''} ${k===dayKey()?'today':''}"><span>${new Date(k+'T12:00:00+08:00').toLocaleDateString('zh-CN',{weekday:'short',timeZone:'Asia/Shanghai'})}</span><div>${state.days[k]?.complete?'✓':k.slice(-2)}</div></div>`).join('');}
 function task(number,title,desc,label,action,done=false){return `<div class="task"><div class="task-number">${done?'✓':number}</div><div class="task-details"><h3>${title}</h3><p>${desc}</p></div><button data-action="${action}">${done?'再练一次':label}</button></div>`;}
 function renderToday(){const d=today(),lesson=lessons[d.lessonId],batch=songBatch(state),learnedToday=batch.filter(x=>state.learned.includes(x.id)).length;const totalDays=Object.values(state.days).filter(x=>x.complete).length,status=dailyStatus(state,mini);
